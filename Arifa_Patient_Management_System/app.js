@@ -1,0 +1,12 @@
+const express=require("express");
+const mysql=require("mysql2/promise");
+const path=require("path");
+const app=express(), PORT=3000;
+app.use(express.json());
+app.use(express.static(path.join(__dirname,"public")));
+const db=mysql.createPool({host:"localhost",user:"root",password:"root010",database:"patient_management",waitForConnections:true,connectionLimit:10});
+app.get("/api/patients",async(req,res)=>{try{const [rows]=await db.query("SELECT * FROM patients ORDER BY patient_id DESC");res.json(rows)}catch(e){console.error(e);res.status(500).json({message:"Database connection failed. Check app.js password and SQL setup."})}});
+app.post("/api/patients",async(req,res)=>{const {name,email,phone,gender,age,problem}=req.body;if(!name||!email||!phone||!gender||age===""||age===undefined||!problem)return res.status(400).json({message:"Please fill in all fields."});try{const [r]=await db.execute("INSERT INTO patients(name,email,phone,gender,age,problem) VALUES(?,?,?,?,?,?)",[name,email,phone,gender,Number(age),problem]);res.status(201).json({message:"Patient added",patient_id:r.insertId})}catch(e){console.error(e);res.status(e.code==="ER_DUP_ENTRY"?409:500).json({message:e.code==="ER_DUP_ENTRY"?"Email already exists.":"Could not add patient."})}});
+app.put("/api/patients/:id",async(req,res)=>{const {name,email,phone,gender,age,problem}=req.body;try{const [r]=await db.execute("UPDATE patients SET name=?,email=?,phone=?,gender=?,age=?,problem=? WHERE patient_id=?",[name,email,phone,gender,Number(age),problem,req.params.id]);if(!r.affectedRows)return res.status(404).json({message:"Patient not found"});res.json({message:"Patient updated"})}catch(e){console.error(e);res.status(500).json({message:"Could not update patient"})}});
+app.delete("/api/patients/:id",async(req,res)=>{try{const [r]=await db.execute("DELETE FROM patients WHERE patient_id=?",[req.params.id]);if(!r.affectedRows)return res.status(404).json({message:"Patient not found"});res.json({message:"Patient deleted"})}catch(e){console.error(e);res.status(500).json({message:"Could not delete patient"})}});
+app.listen(PORT,()=>console.log(`Arifa Patient Management System running at http://localhost:${PORT}`));
